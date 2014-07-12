@@ -9,8 +9,10 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+//import java.io.Serializable;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 
@@ -25,9 +27,9 @@ import android.graphics.Paint;
 import android.graphics.Point;
 import android.util.Log;
 
-public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
+public class Draw extends ReceiverAdapter implements ChannelListener {
 
-	String                         groupname="DrawGroupDemo";
+	String                         groupname="draw-cluster";
 	private Channel                channel=null;
 	private int                    member_size=1;
 	static final boolean           first=true;
@@ -38,12 +40,14 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 	private final Integer          draw_color;
 	private final Random           random=new Random(System.currentTimeMillis());
 	private long                   state_timeout=5000;
-	private Paint paint;
-	private Canvas surface;
-	private MySurface view;
+	private Paint paint = null;
+	@SuppressWarnings("unused")
+	private Canvas surface = null;
+	@SuppressWarnings("unused")
+	private MySurface view = null;
 
 	public Draw(String props, boolean no_channel, boolean jmx, boolean use_state, long state_timeout,
-			boolean use_blocking, Canvas surface, MySurface view) throws Exception {
+			boolean use_unicasts, String name, Canvas surface, MySurface view) throws Exception {
 		this.paint = new Paint();
 		draw_color = selectColor();
 		this.no_channel=no_channel;
@@ -59,12 +63,12 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 		if(no_channel)
 			return;
 
-		channel=new JChannel(props);
-		if(use_blocking)
-			channel.setOpt(Channel.BLOCK, Boolean.TRUE);
-		channel.setOpt(Channel.AUTO_RECONNECT, Boolean.TRUE);
-		channel.setReceiver(this);
-		channel.addChannelListener(this);
+        channel=new JChannel(props);
+        if(name != null)
+            channel.setName(name);
+        channel.setReceiver(this);
+        channel.addChannelListener(this);
+		
 	}
 
 	public void TouchEvent(float x, float y) {
@@ -80,25 +84,30 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 		this.view = view;
 		draw_color = selectColor();
 		this.panel = new DrawPanel(use_state, surface, view);
-		channel.setOpt(Channel.AUTO_RECONNECT, Boolean.TRUE);
-		channel.setReceiver(this);
-		channel.addChannelListener(this);
+		
+        this.channel=channel;
+        channel.setReceiver(this);
+        channel.addChannelListener(this);
+		
 	}
 
 
 	public Draw(Channel channel, boolean use_state, long state_timeout, Canvas surface, MySurface view) throws Exception {
-		this.channel=channel;
+        this.channel=channel;
+
 		draw_color = selectColor();
 		this.use_state=use_state;
 		this.state_timeout=state_timeout;
 		this.surface = surface;
 		this.view = view;
 		this.panel = new DrawPanel(use_state, surface, view);
-		channel.setOpt(Channel.AUTO_RECONNECT, Boolean.TRUE);
-		channel.setReceiver(this);
-		channel.addChannelListener(this);
-	}
 
+        channel.setReceiver(this);
+        channel.addChannelListener(this);
+        this.use_state=use_state;
+        this.state_timeout=state_timeout;
+		
+	}
 
 	public String getGroupName() {
 		return groupname;
@@ -110,48 +119,88 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 	}
 
 	static void help() {
-		System.out.println("\nDraw [-help] [-no_channel] [-props <protocol stack definition>]" +
-		" [-groupname <name>] [-state] [-use_blocking] [-timeout <state timeout>] [-bind_addr <addr>]");
-		System.out.println("-no_channel: doesn't use JGroups at all, any drawing will be relected on the " +
-		"whiteboard directly");
-		System.out.println("-props: argument can be an old-style protocol stack specification, or it can be " +
-		"a URL. In the latter case, the protocol specification will be read from the URL\n");
+		//System.out.println("\nDraw [-help] [-no_channel] [-props <protocol stack definition>]" +
+		//" [-groupname <name>] [-state] [-use_unicasts] [-timeout <state timeout>] [-bind_addr <addr>]");
+		//System.out.println("-no_channel: doesn't use JGroups at all, any drawing will be relected on the " +
+		//"whiteboard directly");
+		//System.out.println("-props: argument can be an old-style protocol stack specification, or it can be " +
+		//"a URL. In the latter case, the protocol specification will be read from the URL\n");
 	}
 
 	private Integer selectColor() {
 		int red=(Math.abs(random.nextInt()) % 255);
 		int green=(Math.abs(random.nextInt()) % 255);
 		int blue=(Math.abs(random.nextInt()) % 255);
-		return new Integer(Color.rgb(red, green, blue));
+		return Integer.valueOf(Color.rgb(red, green, blue));
 	}
 
 	public void go() throws Exception {
-		if(!no_channel && !use_state) {
-			channel.connect(groupname);
-		}
-		if(!no_channel && use_state) {
-			channel.connect(groupname,null,null, state_timeout);
-		}
-		setTitle();
+        if(!no_channel && !use_state) {
+            channel.connect(groupname);            
+        }
+		
+        if(!no_channel && use_state) {
+        	//channel.connect(groupname, null, null, state_timeout); // jgroups 2.x
+        	channel.connect(groupname, null, state_timeout); // jgroups 3.x
+        }
+		
+		//setTitle(title, address);
 	}
 
 
 
 
-	void setTitle(String title) {
+	String setTitle(String title, String address) {
+		Locale locale = Locale.getDefault();
 		String tmp="";
+		
+//		//jgroups 2.x
+//        PhysicalAddress physicalAddress = (PhysicalAddress) 
+//        	      channel.downcall(
+//        	        new Event(
+//        	          Event.GET_PHYSICAL_ADDRESS, channel.getAddress()
+//        	        )
+//        	      );
+		
+      //jgroups 3.x
+        PhysicalAddress physicalAddress = (PhysicalAddress) 
+      	      channel.down(
+      	        new Event(
+      	          Event.GET_PHYSICAL_ADDRESS, channel.getAddress()
+      	        )
+      	      );
+        
 		if(no_channel) {
-			return;
+			tmp+="TouchSurface";
+			tmp+=" [" + physicalAddress + "] ";
+			tmp+=" (0)";
+			return tmp;
 		}
-		if(title == null) {
-			if(channel.getLocalAddress() != null)
-				tmp+=channel.getLocalAddress();
+		else if(title == null) {
+			tmp+=" [" + physicalAddress + "] ";
+			if(channel.getAddress() != null)
+				tmp+=channel.getAddress();
 			tmp+=" (" + member_size + ")";
+			
+			Log.i("touchsurface", tmp);
+			tmp = String.format(locale, "TouchSurface %s", tmp);
+			return tmp;
+		}
+		else {
+			tmp+=title;
+			tmp+=" [" + physicalAddress + "] ";
+			if(channel.getAddress() != null)
+				tmp+=channel.getAddress();
+			tmp+=" (" + member_size + ")";
+			
+			Log.i("touchsurface", tmp);
+			tmp = String.format(locale, "%s", tmp);
+			return tmp;
 		}
 	}
 
-	void setTitle() {
-		setTitle(null);
+	String setTitle() {
+		return setTitle(null, null);
 	}
 
 
@@ -159,9 +208,9 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 	public void receive(Message msg) {
 		byte[] buf=msg.getRawBuffer();
 		if(buf == null) {
-			Log.e("touchsurface", "[" + channel.getLocalAddress() + "] received null buffer from " + msg.getSrc() +
+			Log.e("touchsurface", "[" + channel.getAddress() + "] received null buffer from " + msg.getSrc() +
 					", headers: " + msg.printHeaders());
-			System.err.println("[" + channel.getLocalAddress() + "] received null buffer from " + msg.getSrc() +
+			System.err.println("[" + channel.getAddress() + "] received null buffer from " + msg.getSrc() +
 					", headers: " + msg.printHeaders());
 			return;
 		}
@@ -256,6 +305,7 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 
 		try {
 			byte[] buf=Util.streamableToByteBuffer(comm);
+			//Serializable aux = (Serializable) buf;
 			channel.send(new Message(null, null, buf));
 		}
 		catch(Exception ex) {
@@ -280,23 +330,25 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 	/* ------------------------------ ChannelListener interface -------------------------- */
 
 	public void channelConnected(Channel channel) {
-
+		Log.i("touchsurface", "channelConnected()");
 	}
 
 	public void channelDisconnected(Channel channel) {
-
+		Log.i("touchsurface", "channelDisconnected()");
 	}
 
 	public void channelClosed(Channel channel) {
-
+		Log.i("touchsurface", "channelClosed()");
 	}
 
 	public void channelShunned() {
-		System.out.println("-- received EXIT, waiting for ChannelReconnected callback");
-		setTitle(" Draw Demo - shunned ");
+		Log.i("touchsurface", "channelShunned()");
+		Log.i("touchsurface", "-- received EXIT, waiting for ChannelReconnected callback");
+		setTitle(" Draw - shunned ", null);
 	}
 
 	public void channelReconnected(Address addr) {
+		Log.i("touchsurface", "channelReconnected()");
 		setTitle();
 	}
 
@@ -348,6 +400,7 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 		public void setState(byte[] buf) {
 			synchronized(state) {
 				try {
+					@SuppressWarnings("unchecked")
 					Map<Point, Integer> tmp=(Map<Point,Integer>)Util.objectFromByteBuffer(buf);
 					state.clear();
 					state.putAll(tmp);
@@ -391,7 +444,7 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 			Integer col;
 			for(int i=0; i < num; i++) {
 				point = new Point(in.readInt(), in.readInt());
-				col = new Integer(in.readInt());
+				col = Integer.valueOf(in.readInt());
 				new_state.put(point, col);
 			}
 
@@ -416,6 +469,7 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 
 			try {
 				byte[] buf=Util.streamableToByteBuffer(comm);
+				//Serializable aux = (Serializable) buf;
 				channel.send(new Message(null, null, buf));
 				// Thread.yield();
 			}
@@ -428,7 +482,7 @@ public class Draw extends ExtendedReceiverAdapter implements ChannelListener {
 
 		public void drawPoint(DrawCommand c) {
 			if(c == null) return;
-			Integer col=new Integer(Color.rgb(c.r, c.g, c.b));
+			Integer col=Integer.valueOf(Color.rgb(c.r, c.g, c.b));
 
 			// We draw a circle and then we refresh
 			Paint p = new Paint();

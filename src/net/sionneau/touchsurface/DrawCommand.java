@@ -6,9 +6,13 @@ package net.sionneau.touchsurface;
 
 import org.jgroups.util.Streamable;
 
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.DataInputStream;
+import android.util.Log;
+
+//import java.io.DataInputStream; //jgroups 2.x
+//import java.io.DataOutputStream; //jgroups 2.x
+import java.io.DataInput; //jgroups 3.x
+import java.io.DataOutput; //jgroups 3.x
+//import java.io.IOException;
 
 /**
  * Encapsulates information about a draw command.
@@ -41,24 +45,35 @@ public class DrawCommand implements Streamable {
 		this.b=b;
 	}
 
-
-	public void writeTo(DataOutputStream out) throws IOException {
-		out.writeByte(mode);
-		out.writeInt(x);
-		out.writeInt(y);
-		out.writeInt(r);
-		out.writeInt(g);
-		out.writeInt(b);
-	}
-
-	public void readFrom(DataInputStream in) throws IOException, IllegalAccessException, InstantiationException {
-		mode=in.readByte();
-		x=in.readInt();
-		y=in.readInt();
-		r=in.readInt();
-		g=in.readInt();
-		b=in.readInt();
-	}
+	//jroups 2.x
+//	@Override
+//	public void writeTo(DataOutputStream out) throws IOException {
+//		StringBuilder ret=new StringBuilder();
+//		ret.append("writeTo(): " + mode + ", location(" + x + "," + y + "), color(" + r + ","+ g + "," + b +")");
+//		Log.i("TouchSurface", ret.toString());
+//
+//		out.writeByte(mode);
+//		out.writeInt(x);
+//		out.writeInt(y);
+//		out.writeInt(r);
+//		out.writeInt(g);
+//		out.writeInt(b);
+//	}
+//	//jroups 2.x
+//	@Override
+//	public void readFrom(DataInputStream in) throws IOException, IllegalAccessException, InstantiationException {
+//		mode=in.readByte();
+//		x=in.readInt();
+//		y=in.readInt();
+//		r=in.readInt();
+//		g=in.readInt();
+//		b=in.readInt();
+//
+//		StringBuilder ret=new StringBuilder();
+//		ret.append("readFrom(): " + mode + ", location(" + x + "," + y + "), color(" + r + ","+ g + "," + b +")");
+//		Log.i("TouchSurface", ret.toString());
+//
+//	}
 
 
 	public String toString() {
@@ -71,7 +86,38 @@ public class DrawCommand implements Streamable {
 		default:
 			return "<undefined>";
 		}
+		Log.i("TouchSurface", ret.toString());
 		return ret.toString();
+	}
+
+//	//jgroups 3.x
+	@Override
+	public void readFrom(DataInput in) throws Exception, IllegalAccessException, InstantiationException {
+		mode=in.readByte();
+		x=in.readInt();
+		y=in.readInt();
+		r=in.readInt();
+		g=in.readInt();
+		b=in.readInt();
+
+		StringBuilder ret=new StringBuilder();
+		ret.append("readFrom(): " + mode + ", location(" + x + "," + y + "), color(" + r + ","+ g + "," + b +")");
+		Log.i("TouchSurface", ret.toString());
+
+	}
+	//jgroups 3.x
+	@Override
+	public void writeTo(DataOutput out) throws Exception {
+		StringBuilder ret=new StringBuilder();
+		ret.append("writeTo(): " + mode + ", location(" + x + "," + y + "), color(" + r + ","+ g + "," + b +")");
+		Log.i("TouchSurface", ret.toString());
+
+		out.writeByte(mode);
+		out.writeInt(x);
+		out.writeInt(y);
+		out.writeInt(r);
+		out.writeInt(g);
+		out.writeInt(b);
 	}
 
 }
